@@ -1,0 +1,51 @@
+name: Build & Release EXE
+
+on:
+  push:
+    tags:
+      - "v*"          # يشتغل عند push tag مثل v1.2 أو v2.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install yt-dlp customtkinter pillow pyinstaller
+
+      - name: Build EXE
+        run: pyinstaller build.spec --noconfirm
+
+      - name: Zip EXE
+        run: |
+          Compress-Archive -Path "dist\YouTube-Downloader\*" -DestinationPath "dist\YouTube-Downloader-${{ github.ref_name }}-Windows.zip" -Force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ github.ref_name }} - YouTube + SoundCloud Downloader"
+          body: |
+            ## تحميل
+            **YouTube-Downloader-${{ github.ref_name }}-Windows.zip** — Windows 64-bit (فك الضغط ثم شغّل الـ exe)
+
+            ## المتطلبات
+            - ffmpeg مضاف للـ PATH — مطلوب لجودة 1080p/720p ولاستخراج MP3
+            - [تحميل ffmpeg](https://www.gyan.dev/ffmpeg/builds/)
+
+            ## المميزات
+            - يوتيوب: فيديو واحد أو قناة كاملة
+            - SoundCloud: مقاطع صوتية أو بروفايل كامل
+            - يتخطى المحمّل مسبقاً تلقائياً
+            - إيقاف فوري أثناء التحميل
+            - واجهة عربية RTL
+          files: dist/YouTube-Downloader-${{ github.ref_name }}-Windows.zip
+          draft: false
+          prerelease: false

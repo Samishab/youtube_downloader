@@ -24,11 +24,18 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'distutils', 'lib2to3', 'unittest', 'doctest', 'pydoc',
+        'ensurepip', 'venv', 'idlelib', 'turtledemo', 'turtle',
+        'matplotlib', 'numpy', 'pandas', 'scipy',
+        'xmlrpc', 'ftplib', 'imaplib', 'poplib', 'smtplib',
+        'nntplib', 'telnetlib', 'cgi', 'cgitb', 'curses',
+        'test', 'tkinter.test',
+    ],
     noarchive=False,
 )
 
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure, optimize=2)
 
 exe = EXE(
     pyz,
@@ -43,7 +50,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,        # بدون نافذة CMD
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
