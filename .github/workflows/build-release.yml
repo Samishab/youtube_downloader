@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"          # يشتغل عند push tag مثل v1.2 أو v2.0
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
