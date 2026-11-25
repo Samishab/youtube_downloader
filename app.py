@@ -30,13 +30,33 @@ import yt_dlp
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
+# جميع خيارات الجودة (مشتركة بين المنصتين)
 QUALITY_OPTIONS = {
-    "أفضل جودة":      "bestvideo+bestaudio/best",
-    "1080p":           "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-    "720p":            "bestvideo[height<=720]+bestaudio/best[height<=720]",
-    "480p":            "bestvideo[height<=480]+bestaudio/best[height<=480]",
-    "360p":            "bestvideo[height<=360]+bestaudio/best[height<=360]",
-    "صوت فقط (MP3)":  "bestaudio/best",
+    # YouTube
+    "أفضل جودة":           "bestvideo+bestaudio/best",
+    "1080p":                "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+    "720p":                 "bestvideo[height<=720]+bestaudio/best[height<=720]",
+    "480p":                 "bestvideo[height<=480]+bestaudio/best[height<=480]",
+    "360p":                 "bestvideo[height<=360]+bestaudio/best[height<=360]",
+    "صوت فقط (MP3)":       "bestaudio/best",
+    # SoundCloud
+    "أفضل جودة صوتية":     "bestaudio/best",
+    "MP3 عالي (320k)":     "bestaudio[abr>=300]/bestaudio/best",
+    "MP3 متوسط (128k)":    "bestaudio[abr<=160]/bestaudio/best",
+}
+
+YT_QUALITY_KEYS = ["أفضل جودة", "1080p", "720p", "480p", "360p", "صوت فقط (MP3)"]
+SC_QUALITY_KEYS = ["أفضل جودة صوتية", "MP3 عالي (320k)", "MP3 متوسط (128k)"]
+
+PLATFORM_COLORS = {
+    "youtube":    "#cc2200",
+    "soundcloud": "#ff5500",
+    "other":      ("gray50", "gray50"),
+}
+PLATFORM_LABELS = {
+    "youtube":    "▶ YouTube",
+    "soundcloud": "🎵 SoundCloud",
+    "other":      "",
 }
 
 ARCHIVE_FILE = ".ytdl-archive.txt"   # يُحفظ في مجلد التحميل
@@ -103,6 +123,7 @@ class App(ctk.CTk):
         self._downloading     = False
         self._stop_flag       = False
         self.download_dir     = str(Path.home() / "Downloads")
+        self._last_platform   = "other"
 
         self._fetch_thread:    threading.Thread | None = None
         self._download_thread: threading.Thread | None = None
@@ -148,19 +169,28 @@ class App(ctk.CTk):
         self.url_var = tk.StringVar()
         self.url_entry = ctk.CTkEntry(
             f, textvariable=self.url_var,
-            placeholder_text="الصق رابط فيديو أو قناة يوتيوب…",
+            placeholder_text="الصق رابط يوتيوب أو SoundCloud…",
             height=38, font=ctk.CTkFont(size=12))
         self.url_entry.grid(row=0, column=1, sticky="ew", padx=6, pady=10)
         self.url_entry.bind("<Return>", lambda _: self._fetch_or_cancel())
+        self.url_var.trace_add("write", self._on_url_change)
 
         ctk.CTkLabel(f, text=":الرابط", width=80, anchor="e").grid(
             row=0, column=2, padx=(0, 12), pady=10)
 
-        # صف 1 – الجودة
+        # صف 1 – الجودة + شارة المنصة
         self.quality_var = ctk.StringVar(value="أفضل جودة")
-        ctk.CTkOptionMenu(f, variable=self.quality_var,
-                           values=list(QUALITY_OPTIONS), width=200).grid(
-            row=1, column=0, sticky="w", padx=(10, 6), pady=(0, 10))
+        self.quality_menu = ctk.CTkOptionMenu(
+            f, variable=self.quality_var,
+            values=YT_QUALITY_KEYS, width=200)
+        self.quality_menu.grid(row=1, column=0, sticky="w",
+                                padx=(10, 6), pady=(0, 10))
+
+        self.platform_lbl = ctk.CTkLabel(
+            f, text="", width=140, anchor="w",
+            font=ctk.CTkFont(size=12, weight="bold"))
+        self.platform_lbl.grid(row=1, column=1, sticky="w",
+                                padx=(4, 0), pady=(0, 10))
 
         ctk.CTkLabel(f, text=":الجودة", width=80, anchor="e").grid(
             row=1, column=2, padx=(0, 12), pady=(0, 10))
@@ -295,6 +325,34 @@ class App(ctk.CTk):
             f, height=72, font=ctk.CTkFont(size=11, family="Consolas"))
         self.log_box.grid(row=1, column=0, columnspan=2, sticky="ew",
                            padx=10, pady=(0, 10))
+
+    # ── Platform detection ─────────────────────────────────────────────────────
+    def _detect_platform(self, url: str) -> str:
+        u = url.lower()
+        if "soundcloud.com" in u:
+            return "soundcloud"
+        if "youtube.com" in u or "youtu.be" in u or "music.youtube.com" in u:
+            return "youtube"
+        return "other"
+
+    def _on_url_change(self, *_):
+        url      = self.url_var.get().strip()
+        platform = self._detect_platform(url)
+        if platform == self._last_platform:
+            return
+        self._last_platform = platform
+
+        if platform == "soundcloud":
+            self.quality_menu.configure(values=SC_QUALITY_KEYS)
+            self.quality_var.set(SC_QUALITY_KEYS[0])
+        else:
+            self.quality_menu.configure(values=YT_QUALITY_KEYS)
+            if self.quality_var.get() not in YT_QUALITY_KEYS:
+                self.quality_var.set(YT_QUALITY_KEYS[0])
+
+        lbl   = PLATFORM_LABELS[platform]
+        color = PLATFORM_COLORS[platform]
+        self.platform_lbl.configure(text=lbl, text_color=color)
 
     # ── Helpers ────────────────────────────────────────────────────────────────
     def _pick_dir(self):
@@ -583,15 +641,10 @@ class App(ctk.CTk):
 
     def _dl_worker(self, targets: list):
         quality    = QUALITY_OPTIONS[self.quality_var.get()]
-        audio_only = "صوت" in self.quality_var.get()
+        quality_key = self.quality_var.get()
         total      = len(targets)
         archive    = os.path.join(self.download_dir, ARCHIVE_FILE)
         completed  = 0
-
-        pp = ([{"key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3", "preferredquality": "192"}]
-              if audio_only
-              else [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}])
 
         try:
             for idx, video in enumerate(targets):
@@ -623,6 +676,14 @@ class App(ctk.CTk):
                     elif d["status"] == "finished":
                         self.after(0, lambda: self.status_lbl.configure(
                             text="⚙ جاري المعالجة…"))
+
+                # SoundCloud يكون دائماً audio، YouTube حسب الاختيار
+                is_sc      = "soundcloud.com" in video.url.lower()
+                audio_only = is_sc or "صوت" in quality_key or "صوتية" in quality_key
+                pp = ([{"key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3", "preferredquality": "320" if is_sc else "192"}]
+                      if audio_only
+                      else [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}])
 
                 opts = {
                     "format":           quality,
