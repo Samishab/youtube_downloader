@@ -26,7 +26,7 @@ jobs:
 
       - name: Zip EXE
         run: |
-          Compress-Archive -Path "dist\YouTube-Downloader\*" -DestinationPath "dist\YouTube-Downloader-${{ github.ref_name }}-Windows.zip" -Force
+          Compress-Archive -Path "dist\YouTube-Downloader.exe" -DestinationPath "dist\YouTube-Downloader-${{ github.ref_name }}-Windows.zip" -Force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
